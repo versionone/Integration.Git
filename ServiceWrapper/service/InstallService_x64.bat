@@ -22,6 +22,6 @@ set /p UserName=
 echo "Service Password"
 set /p PassWord=
 
-call prunsrv64.exe //IS//V1GitIntegration --Description="Integration for porting information from Git to VersionOne" --Startup=%START_UP% --Jvm=%JVM% --Classpath="%~dp0..\V1GitIntegration.jar;%CLASSPATH%" ++JvmOptions="-Dderby.stream.error.file=logs/derby.log" --StartMode=jvm --StartClass=com.versionone.git.ServiceHandler --StartMethod=start --StopMode=jvm --StopClass=com.versionone.git.ServiceHandler --StopMethod=stop --StopTimeout=60 --LogPath="%~dp0logs" --StdOutput=auto --StdError=auto --LogPrefix=daemon --LogLevel=%DEBUG_MOD% --LogJniMessages=1 --JvmMs=%JAVA_INIT_MEMORY% --JvmMx=%JAVA_MAX_MEMORY% --JvmSs=%JAVA_STACK_SIZE% --ServiceUser=%UserName% --ServicePassword=%PassWord% --StartPath=%~dp0..\
+call prunsrv64.exe //IS//V1GitIntegration --DisplayName="VersionOne Git Integration" --Description="Integration for porting information from Git to VersionOne" --Startup=%START_UP% --Jvm=%JVM% --Classpath="%~dp0..\V1GitIntegration.jar;%CLASSPATH%" ++JvmOptions="-Dderby.stream.error.file=logs/derby.log" --StartMode=jvm --StartClass=com.versionone.git.ServiceHandler --StartMethod=start --StopMode=jvm --StopClass=com.versionone.git.ServiceHandler --StopMethod=stop --StopTimeout=60 --LogPath="%~dp0logs" --StdOutput=auto --StdError=auto --LogPrefix=daemon --LogLevel=%DEBUG_MOD% --LogJniMessages=1 --JvmMs=%JAVA_INIT_MEMORY% --JvmMx=%JAVA_MAX_MEMORY% --JvmSs=%JAVA_STACK_SIZE% --ServiceUser=%UserName% --ServicePassword=%PassWord% --StartPath="%~dp0.."
 
 call prunmgr.exe //ES//V1GitIntegration
