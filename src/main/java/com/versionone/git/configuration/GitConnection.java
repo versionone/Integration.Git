@@ -5,6 +5,8 @@ import javax.xml.bind.annotation.XmlElement;
 public class GitConnection {
     @XmlElement(name = "Path")
     private String repositoryPath;
+    @XmlElement(name = "AlwaysCloneOnStartup")
+    private Boolean alwaysCloneOnStartup = false;
     @XmlElement(name = "WatchedBranchName")
     private String watchedBranch;
     @XmlElement(name = "BranchFilter")
@@ -21,6 +23,10 @@ public class GitConnection {
 
     public String getRepositoryPath() {
         return repositoryPath;
+    }
+
+    public Boolean getAlwaysCloneOnStartup() {
+        return alwaysCloneOnStartup;
     }
 
     public String getPassword() {
@@ -57,6 +63,7 @@ public class GitConnection {
         if (passphrase != null ? !passphrase.equals(that.passphrase) : that.passphrase != null) return false;
         if (password != null ? !password.equals(that.password) : that.password != null) return false;
         if (!repositoryPath.equals(that.repositoryPath)) return false;
+        if (!alwaysCloneOnStartup.equals(that.alwaysCloneOnStartup)) return false;
         if (!useBranchName.equals(that.useBranchName)) return false;
         if (watchedBranch != null ? !watchedBranch.equals(that.watchedBranch) : that.watchedBranch != null) return false;
         if (link != null ? !link.equals(that.link) : that.link != null) return false;
@@ -66,6 +73,7 @@ public class GitConnection {
     @Override
     public int hashCode() {
         int result = repositoryPath.hashCode();
+        result = 31 * result + alwaysCloneOnStartup.hashCode();
         result = 31 * result + (watchedBranch != null ? watchedBranch.hashCode() : 0);
         result = 31 * result + (password != null ? password.hashCode() : 0);
         result = 31 * result + (passphrase != null ? passphrase.hashCode() : 0);

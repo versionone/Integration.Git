@@ -30,6 +30,7 @@ public class ConfigurationTester {
         Assert.assertEquals("Proxy user name is incorrect.", "proxyUser", proxy.getUserName());
         Assert.assertEquals("Proxy password is incorrect.", "proxyUserPass", proxy.getPassword());
         Assert.assertEquals("Git repository path is incorrect.", "https://github.com/account/repo.git", git.getRepositoryPath());
+        Assert.assertEquals("Incorrect setting for always cloning on startup.", true, git.getAlwaysCloneOnStartup());
         Assert.assertEquals("Git password is incorrect.", "password", git.getPassword());
         Assert.assertEquals("Git passphrase is incorrect.", "passphrase", git.getPassphrase());
         Assert.assertEquals("Git branch name is incorrect.", "master", git.getWatchedBranch());

@@ -16,6 +16,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.*;
@@ -50,7 +51,7 @@ public class GitConnector implements IGitConnector {
     }
 
     public void initRepository() throws GitException {
-    	LOG.debug("Initalizing repository...");
+        LOG.debug("Initalizing repository...");
 
         try {
             cloneRepository();
@@ -246,11 +247,26 @@ public class GitConnector implements IGitConnector {
     }
 
     private void cloneRepository() throws IOException, URISyntaxException {
-    	LOG.debug("Cloning repository...");
+
+        File directory = new File(localDirectory);
         local = new FileRepository(localDirectory);
-        local.create();
 
         URIish uri = new URIish(gitConnection.getRepositoryPath());
+
+        // Unless this repo is configured to always clone on startup,
+        // only re-create it if it doesn't already exist.  This avoids re-cloning every
+        // restart of the integration, which for larger repos can be unnecessarily time consuming.
+        if (gitConnection.getAlwaysCloneOnStartup() || !directory.exists() || !local.getObjectDatabase().exists()) {
+
+            if (directory.exists() && !Utilities.deleteDirectory(directory))
+                LOG.warn(localDirectory + " couldn't be deleted, cloning may fail");
+
+            LOG.info("Cloning repository...");
+            local.create();
+        }
+        else {
+            LOG.info("Not re-cloning repository as it's already present. If you always want to re-clone, switch the AlwaysCloneOnStartup configuration on for this repo");
+        }
 
 		remoteConfig = new RemoteConfig(local.getConfig(), remoteName);
 		remoteConfig.addURI(uri);

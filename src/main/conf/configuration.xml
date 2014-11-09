@@ -24,6 +24,9 @@
             <Password></Password>
             <SshPassphrase></SshPassphrase>
 
+            <!-- Set AlwaysCloneOnStartup to true to always delete then re-clone a repo as the service starts -->
+            <AlwaysCloneOnStartup>true</AlwaysCloneOnStartup>
+
             <!-- Specify a single branch to watch, or leave blank to watch all branches -->
             <WatchedBranchName></WatchedBranchName>
             
@@ -51,6 +54,7 @@
         </GitConnection>
         <GitConnection>
             <Path>git://github.com/edkennard/Integration.Git.Test2.git</Path>
+            <AlwaysCloneOnStartup>true</AlwaysCloneOnStartup>
             <Password></Password>
             <SshPassphrase></SshPassphrase>
             <WatchedBranchName></WatchedBranchName>
@@ -64,6 +68,7 @@
         </GitConnection>
         <GitConnection>
             <Path>git://github.com/edkennard/Integration.Git.Test3.git</Path>
+            <AlwaysCloneOnStartup>false</AlwaysCloneOnStartup>
             <Password></Password>
             <SshPassphrase></SshPassphrase>
             <WatchedBranchName></WatchedBranchName>
