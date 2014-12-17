@@ -131,7 +131,8 @@ public class GitConnector implements IGitConnector {
 
             // Either filter by just the watched branch if one is specified, or get all branch refs
             if (gitConnection.getWatchedBranch() != null && !gitConnection.getWatchedBranch().trim().isEmpty()) {
-                String branchName = Constants.R_REMOTES + "/" + Constants.DEFAULT_REMOTE_NAME +  "/" + gitConnection.getWatchedBranch();
+                String branchName = Constants.R_REMOTES + Constants.DEFAULT_REMOTE_NAME +  "/" + gitConnection.getWatchedBranch();
+                LOG.debug("Branch name to watch is " + branchName);
                 refs = new HashMap();
                 refs.put(branchName, local.getRef(branchName));
             } 
