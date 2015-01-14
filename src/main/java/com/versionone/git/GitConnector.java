@@ -139,7 +139,7 @@ public class GitConnector implements IGitConnector {
             else if (gitConnection.getBranchFilter() != null && !gitConnection.getBranchFilter().trim().isEmpty()) {
             	refs = local.getAllRefs();
             	for (String ref : refs.keySet()) {
-            		if (ref.contains(gitConnection.getBranchFilter())) {
+            		if (ref.matches(gitConnection.getBranchFilter())) {
             			LOG.debug("Remove branch " + ref + " from the watching list since the GitConnection is configured to filter " + gitConnection.getBranchFilter());
             			refs.remove(ref);
             		}
