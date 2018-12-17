@@ -23,6 +23,7 @@
             <Path>https://github.com/account/repo.git</Path>
             <Password>password</Password>
             <SshPassphrase>passphrase</SshPassphrase>
+            <AlwaysCloneOnStartup>true</AlwaysCloneOnStartup>
             <WatchedBranchName>master</WatchedBranchName>
             <UseBranchName>false</UseBranchName>
             <BranchFilter>personal</BranchFilter>
@@ -38,6 +39,7 @@
             <Path>https://github.com/account/repo.git</Path>
             <Password>password</Password>
             <SshPassphrase>passphrase</SshPassphrase>
+            <AlwaysCloneOnStartup>true</AlwaysCloneOnStartup>
             <WatchedBranchName>master</WatchedBranchName>
             <UseBranchName>false</UseBranchName>
             <BranchFilter>personal</BranchFilter>

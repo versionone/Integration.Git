@@ -16,8 +16,10 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.text.DecimalFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -50,7 +52,7 @@ public class GitConnector implements IGitConnector {
     }
 
     public void initRepository() throws GitException {
-    	LOG.debug("Initalizing repository...");
+        LOG.debug("Initalizing repository...");
 
         try {
             cloneRepository();
@@ -82,7 +84,10 @@ public class GitConnector implements IGitConnector {
                 }
             };
 
-            traverseChanges(builder);
+            Iterable<ChangeSetInfo> changeSets = getChangeSetsFromCommits();
+
+            for (ChangeSetInfo changeSet : changeSets)
+                builder.add(changeSet);
 
             return builder.build();
         } catch(NotSupportedException ex) {
@@ -94,68 +99,58 @@ public class GitConnector implements IGitConnector {
         }
     }
 
-    private void traverseChanges(ChangeSetListBuilder builder) throws GitException {
-
-        Iterable<RevCommit> commits = getCommits();
-
-        for (RevCommit commit : commits) {
-
-            // jGit returns data in seconds
-            long millisecond = commit.getCommitTime() *  1000l;
-            ChangeSetInfo info = new ChangeSetInfo(
-                    gitConnection,
-                    commit.getAuthorIdent().getName(),
-                    commit.getFullMessage().trim(),
-                    commit.getId().getName(),
-                    new Date(millisecond));
-
-            if(gitConnection.getUseBranchName()) {
-                List<String> branches = getBranchNames(commit);
-                for(String branch : branches) {
-                    fillReferences(branch, info.getReferences());
-                }
-            } else {
-                fillReferences(info.getMessage(), info.getReferences());
-            }
-
-            builder.add(info);
-        }
-    }
-
-    private Iterable<RevCommit> getCommits() throws GitException {
-        ArrayList<RevCommit> commits = new ArrayList<RevCommit>();
+    private Iterable<ChangeSetInfo> getChangeSetsFromCommits() throws GitException {
+        Map<String, ChangeSetInfo> changeSetMap = new HashMap<String, ChangeSetInfo>();
 
         try {
             Git git = new Git(local);
-            Map<String, Ref> refs;
+            Map<String, Ref> refs = new HashMap();
 
-            // Either filter by just the watched branch if one is specified, or get all branch refs
+            // Either filter by just the watched branch if one is specified, or get all branch refs while respecting filter setting
             if (gitConnection.getWatchedBranch() != null && !gitConnection.getWatchedBranch().trim().isEmpty()) {
                 String branchName = Constants.R_REMOTES + "/" + Constants.DEFAULT_REMOTE_NAME +  "/" + gitConnection.getWatchedBranch();
-                refs = new HashMap();
                 refs.put(branchName, local.getRef(branchName));
-            } 
-            else if (gitConnection.getBranchFilter() != null && !gitConnection.getBranchFilter().trim().isEmpty()) {
-            	refs = local.getAllRefs();
-            	for (String ref : refs.keySet()) {
-            		if (ref.contains(gitConnection.getBranchFilter())) {
-            			LOG.debug("Remove branch " + ref + " from the watching list since the GitConnection is configured to filter " + gitConnection.getBranchFilter());
-            			refs.remove(ref);
-            		}
-            	}
+                LOG.info(String.format("Checking branch '%s'...", branchName));
             }
-            else
-                refs = local.getAllRefs();
+            else {
+                Map<String, Ref> allRefs = local.getAllRefs();
+
+                LOG.debug(String.format("Filtering %s reference%s...", allRefs.size(), refs.size() != 1 ? "s" : ""));
+
+                // Iterate through refs, filtering out tags or ones named in the branch filter
+                for (Map.Entry<String, Ref> refEntry : allRefs.entrySet()) {
+
+                    String refKey = refEntry.getKey();
+
+                    // Skip anything other than branches (e.g. tags) since they're not commit objects and
+                    // will throw an IncorrectObjectTypeException when setting the log command range
+                    if (!refKey.contains("refs/remotes/origin")) {
+                        LOG.debug(String.format("Ignoring %s, not a branch", refKey));
+                        continue;
+                    }
+
+                    // Skip any refs matching the connection's branch filter
+                    if (gitConnection.getBranchFilter() != null && !gitConnection.getBranchFilter().trim().isEmpty() && refKey.contains(gitConnection.getBranchFilter())) {
+                        LOG.debug(String.format("Ignoring %s, matched the connection's branch filter %s", refKey, gitConnection.getBranchFilter()));
+                        continue;
+                    }
+
+                    // Add ref to list for processing
+                    LOG.debug(String.format("Adding branch %s to list for checking", refKey));
+                    refs.put(refKey, refEntry.getValue());
+                }
+                allRefs.clear();
+                LOG.debug(String.format("Checking %s branch%s...", refs.size(), refs.size() != 1 ? "es" : ""));
+            }
+
+            int refCounter = 0;
 
             // Iterate through each branch checking for any new commits since the last one processed
             for (String ref : refs.keySet()) {
 
-                try {
-                    // Skip anything other than branches (e.g. tags) since they're not commit objects and
-                    // will throw an IncorrectObjectTypeException when setting the log command range
-                    if (!ref.contains("refs/remotes/origin"))
-                        continue;
+                refCounter++;
 
+                try {
                     // For each branch traversal use a new log object, since they're intended to be called only once
                     LogCommand logCommand = git.log();
 
@@ -172,18 +167,32 @@ public class GitConnector implements IGitConnector {
 
                     if (persistedHash != null) {
                         AnyObjectId persistedHeadId = local.resolve(persistedHash);
-                        LOG.debug("Checking branch " + ref + " for new commits since the last one processed (" + persistedHash + ")...");
-                        //here we get lock for directory
+                        LOG.debug(String.format("Checking branch %s (%s of %s) for new commits since the last one processed (%s)...",
+                                ref, refCounter, refs.size(), persistedHash));
+
+                        // Here we get lock for directory
                         logCommand.addRange(persistedHeadId, headId);
                     } else {
                         logCommand.add(headId);
-                        LOG.debug("Last commit processed on branch " + ref + " was not found so processing commits from the beginning.");
+                        LOG.debug(String.format("Last commit processed on branch %s (%s of %s) was not found so processing commits from the beginning...",
+                                ref, refCounter, refs.size()));
                     }
 
-                    if(!headHash.equals(persistedHash)) {
+                    if (!headHash.equals(persistedHash)) {
+                        int newCommitCounter = 0;
+
+                        // Search for new commits then immediately convert them into much
+                        // less memory-intensive ChangeSetInfo objects containing only the info we need
                         for (RevCommit commit : logCommand.call()) {
-                            if (!commits.contains(commit))
-                                commits.add(commit);
+                            if (!changeSetMap.containsKey(commit.getId().getName())) {
+                                newCommitCounter++;
+                                ChangeSetInfo changeSet = getChangeSetFromCommit(commit);
+                                changeSetMap.put(changeSet.getRevision(), changeSet);
+                            }
+                        }
+                        if (newCommitCounter > 0) {
+                            DecimalFormat df = new DecimalFormat("#,###");
+                            LOG.debug(String.format("%s new commit(s) found (%s in total)", df.format(newCommitCounter), df.format(changeSetMap.size())));
                         }
                         storage.persistLastCommit(headHash, repositoryId, ref);
                     } else {
@@ -200,12 +209,39 @@ public class GitConnector implements IGitConnector {
             throw new GitException(ex);
         }
 
+        // Convert map to list then immediately clear map
+        ArrayList<ChangeSetInfo> changeSetList = new ArrayList<ChangeSetInfo>(changeSetMap.values());
+        changeSetMap.clear();
+
         // Sort commits by commit time which is needed when they've been taken
         // from multiple branches since they won't be listed chronologically
-        Comparator comparator = new GitCommitComparator();
-        Collections.sort(commits, comparator);
+        Comparator comparator = new ChangeSetComparator();
+        Collections.sort(changeSetList, comparator);
 
-        return commits;
+        return changeSetList;
+    }
+
+    private ChangeSetInfo getChangeSetFromCommit(RevCommit commit) {
+
+        // jGit returns data in seconds
+        long millisecond = commit.getCommitTime() *  1000l;
+        ChangeSetInfo info = new ChangeSetInfo(
+                gitConnection,
+                commit.getAuthorIdent().getName(),
+                commit.getFullMessage().trim(),
+                commit.getId().getName(),
+                new Date(millisecond));
+
+        if (gitConnection.getUseBranchName()) {
+            List<String> branches = getBranchNames(commit);
+            for (String branch : branches) {
+                fillReferences(branch, info.getReferences());
+            }
+        } else {
+            fillReferences(info.getMessage(), info.getReferences());
+        }
+
+        return info;
     }
 
     private void fillReferences(String message, List<String> references) {
@@ -246,11 +282,26 @@ public class GitConnector implements IGitConnector {
     }
 
     private void cloneRepository() throws IOException, URISyntaxException {
-    	LOG.debug("Cloning repository...");
+
+        File directory = new File(localDirectory);
         local = new FileRepository(localDirectory);
-        local.create();
 
         URIish uri = new URIish(gitConnection.getRepositoryPath());
+
+        // Unless this repo is configured to always clone on startup,
+        // only re-create it if it doesn't already exist.  This avoids re-cloning every
+        // restart of the integration, which for larger repos can be unnecessarily time consuming.
+        if (gitConnection.getAlwaysCloneOnStartup() || !directory.exists() || !local.getObjectDatabase().exists()) {
+
+            if (directory.exists() && !Utilities.deleteDirectory(directory))
+                LOG.warn(localDirectory + " couldn't be deleted, cloning may fail");
+
+            LOG.info("Cloning repository...");
+            local.create();
+        }
+        else {
+            LOG.info("Not re-cloning repository as it's already present. If you always want to re-clone, switch the AlwaysCloneOnStartup configuration on for this repo");
+        }
 
 		remoteConfig = new RemoteConfig(local.getConfig(), remoteName);
 		remoteConfig.addURI(uri);
@@ -295,12 +346,12 @@ public class GitConnector implements IGitConnector {
 	}
 
     /** Compares two commits and sorts them by commit time in ascending order */
-    private class GitCommitComparator implements Comparator {
+    private class ChangeSetComparator implements Comparator {
         public int compare(Object object1, Object object2) {
-            RevCommit commit1 = (RevCommit)object1;
-            RevCommit commit2 = (RevCommit)object2;
+            ChangeSetInfo change1 = (ChangeSetInfo)object1;
+            ChangeSetInfo change2 = (ChangeSetInfo)object2;
 
-            return commit1.getCommitTime() - commit2.getCommitTime();
+            return change1.getChangeDate().compareTo(change2.getChangeDate());
         }
     }
 }

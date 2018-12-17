@@ -26,7 +26,7 @@ public class GitPollTask extends TimerTask {
         v1Connector.connect(configuration.getVersionOneConnection());
 
         changeSetWriter = new ChangeSetWriter(configuration.getChangeSet(), v1Connector);
-        cleanupLocalDirectory();
+        createLocalDirectory();
         serviceInitialize();
     }
 
@@ -97,18 +97,19 @@ public class GitPollTask extends TimerTask {
         return true;
     }
 
-    private void cleanupLocalDirectory() {
-        LOG.debug(String.format("Resetting local directory %s...", configuration.getLocalDirectory()));
+    private void createLocalDirectory() {
 
-        if (!Utilities.deleteDirectory(new File(configuration.getLocalDirectory()))) {
-            LOG.warn(configuration.getLocalDirectory() + " couldn't be reset, possibly due to this being the first time the service has been run");
-        }
+        File directory = new File(configuration.getLocalDirectory());
 
-        boolean result = new File(configuration.getLocalDirectory()).mkdir();
+        if (!directory.exists()) {
+            LOG.info(String.format("Creating local directory %s...", configuration.getLocalDirectory()));
 
-        if (!result) {
-            LOG.fatal(configuration.getLocalDirectory() + " couldn't be created");
-            System.exit(-1);
+            boolean result = directory.mkdir();
+
+            if (!result) {
+                LOG.fatal(configuration.getLocalDirectory() + " couldn't be created");
+                System.exit(-1);
+            }
         }
     }
 }
